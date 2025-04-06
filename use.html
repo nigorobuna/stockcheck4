@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>在庫登録フォーム</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, button {
+      font-size: 16px;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>在庫登録フォーム</h1>
+
+  <!-- フォーム開始 -->
+  <form id="stockForm">
+
+    <!-- 使った人：ユーザーが手入力 -->
+    <label for="user">使った人：</label>
+    <input type="text" id="user" name="user" required>
+
+    <!-- 品目：QRコードから自動入力されるが、手入力できるように修正 -->
+    <label for="item">品目名：</label>
+    <input type="text" id="item" name="item" required>
+
+    <!-- 使用数：ユーザーが手入力 -->
+    <label for="count">使った数：</label>
+    <input type="number" id="count" name="count" required>
+
+    <!-- 送信ボタン -->
+    <br><br>
+    <button type="submit">登録</button>
+  </form>
+
+  <!-- 登録完了メッセージを表示する場所 -->
+  <p id="message"></p>
+
+  <!-- QRからの自動入力を行うJavaScript -->
+  <script>
+    // ページのURLから ?item=〇〇 の部分を取得する
+    const params = new URLSearchParams(window.location.search);
+    const itemName = params.get("item"); // itemパラメータだけを取り出す
+
+    // item入力欄に自動で反映する
+    if (itemName) {
+      document.getElementById("item").value = decodeURIComponent(itemName);
+    }
+
+    // フォームが送信されたときの処理
+    document.getElementById("stockForm").addEventListener("submit", function(e) {
+      e.preventDefault(); // ページのリロードを止める
+
+      // 入力値を取得
+      const user = document.getElementById("user").value; // 使った人
+      const item = document.getElementById("item").value; // 品目
+      const count = document.getElementById("count").value; // 使用数
+
+      // Google Apps Script WebアプリのURLを指定
+      const scriptURL = "https://script.google.com/macros/s/AKfycbw2_cDeA-pr67QULCvXAc52ZS2BHLJcIHziLNfcTHrDrNiktpO80HmX4fe7z4gesY7-Gg/exec";
+
+      // サーバーに送信するデータを作成（JSON形式）
+      const formData = new FormData();
+      formData.append("user", user);    // 使った人のデータ
+      formData.append("item", item);    // 品目名
+      formData.append("count", count);  // 使用数
+
+      // データ送信（非同期）
+      fetch(scriptURL, { method: "POST", body: formData })
+        .then(response => response.text())
+        .then(result => {
+          // 登録完了メッセージを表示
+          document.getElementById("message").textContent = "登録しました！ありがとう😊";
+          // フォームをリセット
+          document.getElementById("stockForm").reset();
+        })
+        .catch(error => {
+          document.getElementById("message").textContent = "エラーが発生しました";
+          console.error("Error:", error);
+        });
+    });
+  </script>
+
+</body>
+</html>
