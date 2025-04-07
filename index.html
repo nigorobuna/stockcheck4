@@ -1,117 +1,90 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>登録フォーム</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        padding: 2em;
-      }
-      label {
-        display: block;
-        margin-top: 1em;
-      }
-      input,
-      select {
-        width: 100%;
-        padding: 0.5em;
-      }
-      button {
-        margin-top: 1.5em;
-        padding: 0.7em;
-        width: 100%;
-        font-size: 1em;
-      }
-    </style>
-  </head>
-  <body>
-    <h2>登録フォーム</h2>
-    <form id="reportForm">
-      <label
-        >品目（QRで自動入力も可能）
-        <input type="text" name="item" id="item" required />
-      </label>
-      <label
-        >使用者
-        <input type="text" name="user" required />
-      </label>
-      <label
-        >使用日
-        <input type="date" name="date" />
-      </label>
-      <label
-        >個数
-        <input type="number" name="count" value="1" min="1" />
-      </label>
-      <button type="submit">送信</button>
-    </form>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>QRコード登録フォーム</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>QRコードを読み取るフォーム</h2>
+  <form id="reportForm">
+    <label>品目 (QRコードで自動入力)
+      <input type="text" name="item" id="item" required>
+    </label>
 
-    <!-- QR読み取り用ボタン -->
-    <button id="qrReaderBtn">QRコードを読み込む</button>
-    <p id="result"></p>
+    <label>使用者
+      <input type="text" name="user" required>
+    </label>
 
-    <!-- QRコード読み取り用のスクリプト -->
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
-    <script>
-      // フォーム送信時の処理
-      document
-        .getElementById("reportForm")
-        .addEventListener("submit", function (e) {
-          e.preventDefault(); // ページ遷移を防ぐ
-          const formData = new FormData(this);
+    <label>使用日
+      <input type="date" name="date">
+    </label>
 
-          // Google Apps Script の doPost にデータ送信
-          fetch("/", {
-            method: "POST",
-            body: formData,
-          })
-            .then((res) => res.text())
-            .then((msg) => {
-              document.getElementById("result").innerText = msg; // 結果を表示
-              document.getElementById("reportForm").reset(); // フォーム初期化
+    <label>個数
+      <input type="number" name="count" value="1" min="1">
+    </label>
+
+    <button type="submit">送信</button>
+  </form>
+
+  <button id="start-camera">QRコードを読み込む</button>
+
+  <script>
+    document.getElementById('start-camera').addEventListener('click', function() {
+      // QRコード読み取り用のウィンドウを開く
+      const qrWindow = window.open('', '', 'width=400,height=400');
+      qrWindow.document.write('<h2>QRコードをスキャンしてください</h2>');
+      qrWindow.document.write('<video id="video" width="100%" height="auto" style="border: 1px solid #ccc;"></video>');
+      qrWindow.document.write('<canvas id="canvas" style="display: none;"></canvas>');
+      qrWindow.document.write('<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>');
+
+      qrWindow.document.write(`
+        <script>
+          const video = document.getElementById('video');
+          const canvas = document.getElementById('canvas');
+          
+          navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function(stream) {
+              video.srcObject = stream;
+              video.play();
+              requestAnimationFrame(scanQRCode);
+            }).catch(function(err) {
+              alert("カメラにアクセスできません: " + err);
             });
-        });
 
-      // URLに ?item=〇〇 がある場合、自動で「品目」欄に入力
-      const params = new URLSearchParams(location.search);
-      if (params.has("item")) {
-        document.getElementById("item").value = params.get("item");
-      }
+          function scanQRCode() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+              canvas.height = video.videoHeight;
+              canvas.width = video.videoWidth;
 
-      // QRコード読み取り開始
-      const qrReaderBtn = document.getElementById("qrReaderBtn");
-      qrReaderBtn.addEventListener("click", function () {
-        const html5QrCode = new Html5Qrcode("reader");
+              const context = canvas.getContext('2d');
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // カメラ起動 & QRコード読み取り
-        html5QrCode
-          .start(
-            { facingMode: "environment" }, // 環境カメラ（後ろ側のカメラ）を使用
-            {
-              fps: 10, // フレームレート
-              qrbox: 250, // QRコードを読み取るエリアのサイズ
-            },
-            (decodedText) => {
-              // QRコード読み取り後の処理
-              console.log("QRコードが読み取られました:", decodedText); // コンソールにQRコードの内容を表示
-              document.getElementById("item").value = decodedText; // 品目欄に設定
-              html5QrCode.stop(); // 読み取り停止
-            },
-            (error) => {
-              console.error("QRコード読み取りエラー:", error); // エラーログ
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+
+              if (qrCode) {
+                const qrText = qrCode.data;
+                window.opener.document.getElementById("item").value = qrText;
+                window.close();
+              }
             }
-          )
-          .catch((err) => {
-            console.error("QRコード読み取りエラー:", err);
-          });
-      });
-    </script>
 
-    <!-- QRコード読み取り結果表示用エリア -->
-    <div
-      id="reader"
-      style="width: 300px; height: 300px; margin-top: 20px"
-    ></div>
-  </body>
+            requestAnimationFrame(scanQRCode);
+          }
+        </script>
+      `);
+    });
+  </script>
+</body>
 </html>
